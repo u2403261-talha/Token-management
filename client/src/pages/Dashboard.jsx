@@ -1,6 +1,7 @@
 // Dashboard page: displays organizer events with create, edit, delete, and manage actions.
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { storage } from "../services/storage";
 
 function Dashboard() {
   const [events, setEvents] = useState([]);
@@ -11,25 +12,17 @@ function Dashboard() {
 
   // Fetch all events belonging to the logged-in organizer
   const loadEvents = async () => {
-    const jwt = localStorage.getItem("jwt");
-    if (!jwt) {
+    if (!storage.getCurrentUser()) {
       navigate("/login");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/events", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to load events");
-        return;
-      }
+      const data = await storage.getEvents();
       setEvents(data);
     } catch (err) {
-      setError("Network error loading events");
+      setError(err.message || "Failed to load events");
     } finally {
       setLoading(false);
     }
@@ -42,26 +35,14 @@ function Dashboard() {
   // Create a new event with the entered title
   const handleCreate = async (e) => {
     e.preventDefault();
-    const jwt = localStorage.getItem("jwt");
+    if (!title.trim()) return;
     setError("");
     try {
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({ title }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to create event");
-        return;
-      }
+      await storage.createEvent(title.trim());
       setTitle("");
       loadEvents();
     } catch (err) {
-      setError("Network error creating event");
+      setError(err.message || "Failed to create event");
     }
   };
 
@@ -69,50 +50,28 @@ function Dashboard() {
   const handleEdit = async (event) => {
     const newTitle = window.prompt("Enter new title:", event.title);
     if (!newTitle || newTitle.trim() === event.title) return;
-    const jwt = localStorage.getItem("jwt");
     try {
-      const res = await fetch(`/api/events/${event._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({ title: newTitle }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to update event");
-        return;
-      }
+      await storage.updateEvent(event._id, newTitle.trim());
       loadEvents();
     } catch (err) {
-      setError("Network error updating event");
+      setError(err.message || "Failed to update event");
     }
   };
 
   // Confirm and delete event and its tokens
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this event?")) return;
-    const jwt = localStorage.getItem("jwt");
     try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to delete event");
-        return;
-      }
+      await storage.deleteEvent(id);
       loadEvents();
     } catch (err) {
-      setError("Network error deleting event");
+      setError(err.message || "Failed to delete event");
     }
   };
 
-  // Log out by clearing jwt from localStorage
+  // Log out by clearing session
   const handleLogout = () => {
-    localStorage.removeItem("jwt");
+    storage.logout();
     navigate("/login");
   };
 

@@ -1,10 +1,10 @@
-// Login page: allows organizers to authenticate and saves the jwt to localStorage.
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { storage } from "../services/storage";
 
 function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("organizer@test.com");
+  const [password, setPassword] = useState("password123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,25 +16,12 @@ function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Failed to log in");
-        setLoading(false);
-        return;
-      }
-
-      // Store the received jwt in localStorage and open dashboard
+      const data = await storage.login(email, password);
+      // Store session and open dashboard
       localStorage.setItem("jwt", data.jwt);
       navigate("/dashboard");
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError(err.message || "Failed to log in");
     } finally {
       setLoading(false);
     }

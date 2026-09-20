@@ -1,49 +1,38 @@
-// ManageEvent page: shows QR code, shareable link, token list, and mark-done actions.
+// ManageEvent page: shows QR code, shareable link, token list, walk-in form, and mark-done actions.
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
+import { storage } from "../services/storage";
 
 function ManageEvent() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
   const [tokens, setTokens] = useState([]);
+  const [attendeeName, setAttendeeName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const joinUrl = `${window.location.origin}/join/${id}`;
+  const joinUrl = event
+    ? `${window.location.origin}/join/${id}?title=${encodeURIComponent(event.title)}`
+    : `${window.location.origin}/join/${id}`;
 
   // Fetch event details and its tokens
   const loadData = async () => {
-    const jwt = localStorage.getItem("jwt");
-    if (!jwt) {
+    if (!storage.getCurrentUser()) {
       navigate("/login");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const eventRes = await fetch(`/api/events/${id}`, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      const eventData = await eventRes.json();
-      if (!eventRes.ok) {
-        setError(eventData.message || "Failed to load event");
-        return;
-      }
+      const eventData = await storage.getEvent(id);
       setEvent(eventData);
 
-      const tokensRes = await fetch(`/api/tokens?eventId=${id}`, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      const tokensData = await tokensRes.json();
-      if (!tokensRes.ok) {
-        setError(tokensData.message || "Failed to load tokens");
-        return;
-      }
+      const tokensData = await storage.getTokens(id);
       setTokens(tokensData);
     } catch (err) {
-      setError("Network error loading event data");
+      setError(err.message || "Failed to load event data");
     } finally {
       setLoading(false);
     }
@@ -53,26 +42,26 @@ function ManageEvent() {
     loadData();
   }, [id]);
 
-  // Mark a waiting token as done
-  const handleMarkDone = async (tokenId) => {
-    const jwt = localStorage.getItem("jwt");
+  // Add walk-in attendee directly from manage screen
+  const handleAddAttendee = async (e) => {
+    e.preventDefault();
+    if (!attendeeName.trim()) return;
     try {
-      const res = await fetch(`/api/tokens/${tokenId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({ status: "done" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to update token");
-        return;
-      }
+      await storage.joinEvent(id, attendeeName.trim(), event ? event.title : "");
+      setAttendeeName("");
       loadData();
     } catch (err) {
-      setError("Network error updating token");
+      setError(err.message || "Failed to add attendee");
+    }
+  };
+
+  // Mark a waiting token as done
+  const handleMarkDone = async (tokenId) => {
+    try {
+      await storage.markTokenDone(tokenId);
+      loadData();
+    } catch (err) {
+      setError(err.message || "Failed to update token");
     }
   };
 
@@ -90,8 +79,23 @@ function ManageEvent() {
         <a href={joinUrl} target="_blank" rel="noreferrer" className="link-text">{joinUrl}</a>
       </div>
 
+      <div className="walkin-section" style={{ margin: "20px 0", padding: "16px", background: "#f8f9fa", borderRadius: "8px" }}>
+        <h4>Issue Token / Add Walk-in Attendee</h4>
+        <form onSubmit={handleAddAttendee} style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+          <input
+            type="text"
+            placeholder="Attendee Name"
+            value={attendeeName}
+            onChange={(e) => setAttendeeName(e.target.value)}
+            required
+            style={{ margin: 0 }}
+          />
+          <button type="submit" style={{ whiteSpace: "nowrap" }}>Issue Token</button>
+        </form>
+      </div>
+
       <div className="header-bar">
-        <p><strong>Total people: {tokens.length}</strong></p>
+        <p><strong>Total people in queue: {tokens.length}</strong></p>
         <button onClick={loadData} className="secondary">Refresh</button>
       </div>
 

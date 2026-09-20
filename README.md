@@ -116,8 +116,11 @@ When demonstrating the app live on a mobile phone:
 
 ### 2. Deploy on Vercel
 1. Go to [Vercel Dashboard](https://vercel.com/new) and select **Import** next to your new GitHub repository.
-2. Under **Environment Variables**, add:
-   - `MONGO_URI`: Your MongoDB Atlas connection string (e.g., `mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/token_system?retryWrites=true&w=majority`).
-   - `JWT_SECRET`: A secure random secret key (e.g., `my_production_jwt_secret_key_123`).
+2. No environment variables or external database setup needed!
 3. Click **Deploy**.
-4. Vercel will automatically build the Vite frontend (`client/dist`) and mount the serverless Express API (`/api/*`).
+4. Vercel will automatically build the application and provide a live URL in seconds.
+
+> **Default Demo Account**:
+> - Email: `organizer@test.com`
+> - Password: `password123`
+> *(You can also register any new account on the register page!)*
