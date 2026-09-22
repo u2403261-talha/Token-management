@@ -1,17 +1,25 @@
-// Routes for managing tokens within an event.
+// Routes for retrieving and updating tokens in MongoDB with owner authorization.
 const express = require("express");
 const Token = require("../models/Token");
+const Event = require("../models/Event");
 
 const router = express.Router();
 
-// Get all tokens for an event, sorted by tokenNumber ascending (arrival order)
+// GET /api/tokens?eventId=... - Retrieve tokens for an event sorted by number
 router.get("/", async (req, res) => {
   try {
     const { eventId } = req.query;
     if (!eventId) {
-      return res.status(400).json({ message: "eventId query parameter is required" });
+      return res.status(400).json({ message: "eventId parameter is required" });
     }
 
+    // Authorization check: ensure event belongs to the logged-in organizer
+    const event = await Event.findOne({ _id: eventId, owner: req.userId });
+    if (!event) {
+      return res.status(404).json({ message: "Event not found or access unauthorized" });
+    }
+
+    // Find all tokens for this event from MongoDB, sorted by tokenNumber ascending
     const tokens = await Token.find({ event: eventId }).sort({ tokenNumber: 1 });
     return res.status(200).json(tokens);
   } catch (err) {
@@ -19,25 +27,29 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Update a token's status (must be "waiting" or "done")
+// PUT /api/tokens/:id - Update token status in MongoDB (waiting, serving, completed, done, skipped)
 router.put("/:id", async (req, res) => {
   try {
     const { status } = req.body;
-    if (status !== "waiting" && status !== "done") {
-      return res.status(400).json({ message: "Status must be 'waiting' or 'done'" });
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
     }
 
-    const token = await Token.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-
-    if (!token) {
+    const tokenDoc = await Token.findById(req.params.id);
+    if (!tokenDoc) {
       return res.status(404).json({ message: "Token not found" });
     }
 
-    return res.status(200).json(token);
+    // Authorization check: ensure event belonging to this token is owned by logged-in organizer
+    const event = await Event.findOne({ _id: tokenDoc.event, owner: req.userId });
+    if (!event) {
+      return res.status(403).json({ message: "Unauthorized token update" });
+    }
+
+    tokenDoc.status = status;
+    await tokenDoc.save();
+
+    return res.status(200).json(tokenDoc);
   } catch (err) {
     return res.status(500).json({ message: "Server error updating token" });
   }

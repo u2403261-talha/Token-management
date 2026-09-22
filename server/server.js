@@ -24,33 +24,21 @@ app.use("/api/public", publicRoutes);
 app.use("/api/events", authMiddleware, eventRoutes);
 app.use("/api/tokens", authMiddleware, tokenRoutes);
 
-// Reusable database connection with serverless connection pooling
+// Connect to MongoDB database
 const connectDB = async () => {
   if (mongoose.connection.readyState === 1) {
     return;
   }
 
-  let uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/token_system";
   try {
-    // Try connecting to configured MongoDB (e.g. MongoDB Atlas in production or local daemon)
-    await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
-    console.log("Connected to MongoDB successfully at:", uri);
+    await mongoose.connect(MONGO_URI);
+    console.log("Connected to MongoDB successfully");
   } catch (err) {
-    // In Vercel serverless environment, throw error so organizer knows to configure Atlas
-    if (process.env.VERCEL) {
-      console.error("Vercel Serverless: MongoDB connection failed. Please check MONGO_URI in environment variables:", err.message);
-      throw err;
-    }
-    console.log("Local MongoDB not reachable, launching embedded database...");
-    const { MongoMemoryServer } = require("mongodb-memory-server");
-    const mongod = await MongoMemoryServer.create();
-    uri = mongod.getUri();
-    await mongoose.connect(uri);
-    console.log("Connected to embedded MongoDB successfully at:", uri);
+    console.error("MongoDB connection error:", err.message);
   }
 };
 
-// Start standalone server when executed directly (e.g., node server.js)
+// Start server
 const startServer = async () => {
   await connectDB();
   app.listen(PORT, () => {
@@ -65,4 +53,3 @@ if (require.main === module) {
 }
 
 module.exports = { app, connectDB };
-
