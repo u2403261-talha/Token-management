@@ -2,6 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
 const publicRoutes = require("./routes/public");
@@ -15,6 +16,13 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/token_syst
 
 // Parse incoming JSON request bodies
 app.use(express.json());
+// Allow frontend requests from local development and Netlify
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://token-manage.netlify.app"
+  ]
+}));
 
 // Public routes (no login required)
 app.use("/api/auth", authRoutes);
